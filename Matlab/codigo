@@ -1,0 +1,95 @@
+%% Práctica: Inducción Electromagnética - Transformadores
+% Ajuste lineal Vs vs Vp para los 3 momentos
+clear; clc; close all;
+
+%% ===================== DATOS =====================
+% Momento 1: 400 -> 400 (aislamiento), m teórica = 1
+Vp1 = [1.05 1.94 3.15 3.97 4.95 6.01 7.03 8.09 9.18 10.02];
+Vs1 = [0.92 1.72 2.81 3.567 4.53 5.473 6.48 7.49 8.52 9.37];
+m1_teo = 400/400;
+
+% Momento 2: 200 -> 800 (elevador), m teórica = 4
+Vp2 = [1.071 2.142 3.27 4.05 4.97 6.17 7.10 8.13 9.02 9.93];
+Vs2 = [3.98 8.45 12.51 15.52 19.25 23.86 27.47 31.42 34.92 38.52];
+m2_teo = 800/200;
+
+% Momento 3: 800 -> 400 (reductor), m teórica = 0.5
+Vp3 = [1.08 2.018 3.19 3.96 5.22 6.18 7.11 8.07 9.02 10.15];
+Vs3 = [0.472 0.89 1.43 1.78 2.367 2.81 3.25 3.696 4.113 4.682];
+m3_teo = 400/800;
+
+%% ===================== PROCESAMIENTO =====================
+Vp = {Vp1, Vp2, Vp3};
+Vs = {Vs1, Vs2, Vs3};
+mteo = [m1_teo, m2_teo, m3_teo];
+nombres = {'Aislamiento (400/400)', 'Elevador (200/800)', 'Reductor (800/400)'};
+archivos = {'Grafica_Matlab_Momento1.png', ...
+            'Grafica_Matlab_Momento2.png', ...
+            'Grafica_Matlab_Momento3.png'};
+
+fprintf('\n=========== RESULTADOS DEL AJUSTE LINEAL ===========\n');
+
+for k = 1:3
+    x = Vp{k}(:);
+    y = Vs{k}(:);
+
+    % --- Ajuste lineal con intercepto: Vs = m*Vp + b ---
+    p = polyfit(x, y, 1);
+    m_exp = p(1);
+    b = p(2);
+    yfit = polyval(p, x);
+
+    % --- R^2 ---
+    SS_res = sum((y - yfit).^2);
+    SS_tot = sum((y - mean(y)).^2);
+    R2 = 1 - SS_res/SS_tot;
+
+    % --- Ajuste forzado por el origen: Vs = m*Vp ---
+    m_origen = x \ y;
+
+    % --- Errores porcentuales ---
+    err = abs(mteo(k) - m_exp)/mteo(k)*100;
+    err_origen = abs(mteo(k) - m_origen)/mteo(k)*100;
+
+    % --- Error porcentual punto a punto ---
+    Vs_teo = mteo(k)*x;
+    err_puntos = abs(Vs_teo - y)./Vs_teo*100;
+
+    % --- Consola ---
+    fprintf('\n--- %s ---\n', nombres{k});
+    fprintf('Pendiente teórica            : %.4f\n', mteo(k));
+    fprintf('Pendiente experimental       : %.4f\n', m_exp);
+    fprintf('Intercepto                   : %.4f V\n', b);
+    fprintf('R^2                          : %.6f\n', R2);
+    fprintf('Error porcentual (pendiente) : %.2f %%\n', err);
+    fprintf('Pendiente (forzada al origen): %.4f  (error %.2f %%)\n', m_origen, err_origen);
+    fprintf('Error punto a punto (%%): '); fprintf('%.2f  ', err_puntos); fprintf('\n');
+
+    % --- Gráfica ---
+    fig = figure('Color','w','Position',[100 100 600 450]);
+    hold on; grid on; box on;
+    plot(x, y, 'bo', 'MarkerFaceColor','b', 'DisplayName','Datos experimentales');
+    xx = linspace(0, max(x)*1.05, 100);
+    plot(xx, polyval(p, xx), 'r-', 'LineWidth', 1.5, ...
+        'DisplayName', sprintf('Ajuste: V_s = %.4f V_p %+.4f (R^2 = %.4f)', m_exp, b, R2));
+    plot(xx, mteo(k)*xx, 'k--', 'LineWidth', 1.2, ...
+        'DisplayName', sprintf('Teórica: m = %.2f', mteo(k)));
+    xlabel('V_p (V)', 'FontSize', 12);
+    ylabel('V_s (V)', 'FontSize', 12);
+    title(['Transformador ' nombres{k}], 'FontSize', 12);
+    legend('Location','northwest', 'FontSize', 9);
+    xlim([0 max(x)*1.05]);
+    set(gca, 'FontSize', 11);
+
+    exportgraphics(fig, archivos{k}, 'Resolution', 300);
+
+    % Guardar para tabla resumen
+    res(k,:) = [mteo(k), m_exp, err];
+end
+
+%% ===================== TABLA RESUMEN =====================
+fprintf('\n=========== TABLA RESUMEN ===========\n');
+fprintf('%-24s %10s %12s %10s\n', 'Transformador', 'm teórica', 'm experim.', 'Error (%)');
+for k = 1:3
+    fprintf('%-24s %10.4f %12.4f %10.2f\n', nombres{k}, res(k,1), res(k,2), res(k,3));
+end
